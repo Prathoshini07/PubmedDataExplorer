@@ -8,12 +8,15 @@ PubMed Data Explorer is an AI-powered application that integrates PubMed data wi
 - **Discover Similar Articles**: Find related articles using K-Means clustering based on the similarity of article titles.
 - **Interactive UI**: User-friendly interface built with Streamlit.
 
+## About PubMed
+[PubMed](https://pubmed.ncbi.nlm.nih.gov/) is a free resource developed by the National Center for Biotechnology Information (NCBI) that provides access to a vast database of biomedical and life sciences literature. It includes millions of abstracts and citations from journals worldwide, making it an essential tool for researchers, healthcare professionals, and students.
+
 ## How It Works
 
 ### Backend
 1. **Data Source**: The application scrapes article metadata from the [PubMed website](https://pubmed.ncbi.nlm.nih.gov/) and stores it in a MongoDB database.
 2. **MongoDB Integration**: Articles are stored with fields such as PMID, title, abstract, authors, journal, and publication date for efficient querying and clustering.
-3. **Hierarchical Metadata Clustering**:
+3. **Hierarchical Metadata Clustering**: 
    - An Excel sheet with metadata is used to associate PMIDs with clustering information.
    - This sheet contains columns:
      - `pmid`: Unique PubMed ID.
