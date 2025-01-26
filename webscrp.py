@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-import psycopg2
+from pymongo import MongoClient
 from concurrent.futures import ThreadPoolExecutor
 import time
 
@@ -45,67 +45,26 @@ def get_pubmed_data(row):
 
     return (pmid, lev1_cluster_id, lev2_cluster_id, lev3_cluster_id, lev4_cluster_id, title, abstract, authors, journal, pub_date, doi, keywords)
 
-# Function to insert data into the PostgreSQL database
-def insert_data_to_postgres(data, connection):
+# Function to insert data into MongoDB
+def insert_data_to_mongo(data):
     try:
-        cursor = connection.cursor()
-        # SQL query to insert data into the Datas table
-        insert_query = """
-        INSERT INTO Datas (pmid, lev1_cluster_id, lev2_cluster_id, lev3_cluster_id, lev4_cluster_id, title, abstract, authors, journal, publication_date, doi, keywords) 
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
-        cursor.executemany(insert_query, data)
-        connection.commit()
+        # MongoDB connection URI
+        mongo_uri = "mongodb+srv://postgres:12345@cluster0.qnioi.mongodb.net/pubmed?retryWrites=true&w=majority"
+        client = MongoClient(mongo_uri)  # Connect to MongoDB
+        db = client.get_database() 
+        collection = db.get_collection('Datas') 
+        collection.insert_many(data)
+        print(f"Inserted {len(data)} records into MongoDB.")
     except Exception as e:
-        print(f"Failed to insert data: {e}")
+        print(f"Failed to insert data into MongoDB: {e}")
     finally:
-        cursor.close()
-
-# Function to create the Datas table if it doesn't exist
-def create_table_if_not_exists(connection):
-    try:
-        cursor = connection.cursor()
-        create_table_query = """
-        CREATE TABLE IF NOT EXISTS Datas (
-            pmid BIGINT PRIMARY KEY,
-            lev1_cluster_id INT,
-            lev2_cluster_id INT,
-            lev3_cluster_id INT,
-            lev4_cluster_id INT,
-            title TEXT,
-            abstract TEXT,
-            authors TEXT,
-            journal TEXT,
-            publication_date TEXT,
-            doi TEXT,
-            keywords TEXT
-        )
-        """
-        cursor.execute(create_table_query)
-        connection.commit()
-    except Exception as e:
-        print(f"Failed to create table: {e}")
-    finally:
-        cursor.close()
+        client.close()
 
 # Main function to handle the workflow
 def main():
     try:
-        # Connect to the PostgreSQL database
-        connection = psycopg2.connect(
-            user="postgres",
-            password="Sanjeeth1.,",
-            host="localhost",
-            port="5433",
-            database="postgres"
-        )
-        print("Connected to the database")
-
-        # Create the Datas table if it doesn't exist
-        create_table_if_not_exists(connection)
-
         # Read the first 500 rows from the CSV
-        df = pd.read_csv("C:/Users/sanje/Desktop/ML/PMID_cluster_relation_202401.csv", nrows=500)
+        df = pd.read_csv(r"P:\Ml_package\ML\PMID_cluster_relation_202401.csv", nrows=500)
 
         start_time = time.time()
 
@@ -114,23 +73,30 @@ def main():
             results = list(executor.map(get_pubmed_data, df.to_dict('records')))
 
         # Filter out entries missing title or abstract
-        data = [(pmid, lev1_cluster_id, lev2_cluster_id, lev3_cluster_id, lev4_cluster_id, title, abstract, authors, journal, pub_date, doi, keywords) 
-                for pmid, lev1_cluster_id, lev2_cluster_id, lev3_cluster_id, lev4_cluster_id, title, abstract, authors, journal, pub_date, doi, keywords in results 
-                if title and abstract]
+        data = [{
+            "pmid": pmid,
+            "lev1_cluster_id": lev1_cluster_id,
+            "lev2_cluster_id": lev2_cluster_id,
+            "lev3_cluster_id": lev3_cluster_id,
+            "lev4_cluster_id": lev4_cluster_id,
+            "title": title,
+            "abstract": abstract,
+            "authors": authors,
+            "journal": journal,
+            "publication_date": pub_date,
+            "doi": doi,
+            "keywords": keywords
+        } for pmid, lev1_cluster_id, lev2_cluster_id, lev3_cluster_id, lev4_cluster_id, title, abstract, authors, journal, pub_date, doi, keywords in results if title and abstract]
 
         if data:
             insert_start_time = time.time()
-            insert_data_to_postgres(data, connection)
+            insert_data_to_mongo(data)  # Insert into MongoDB
             print(f"Time taken to insert data: {time.time() - insert_start_time:.2f} seconds")
 
         print(f"Total time taken: {time.time() - start_time:.2f} seconds")
 
     except Exception as e:
         print(f"Error: {e}")
-    finally:
-        if connection:
-            connection.close()
-            print("PostgreSQL connection is closed")
 
 if __name__ == "__main__":
     main()
